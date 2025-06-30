@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import log "core:log"
 import glm "core:math/linalg/glsl"
 import sdl "vendor:sdl2"
 import img "vendor:sdl2/image"
@@ -23,14 +24,15 @@ player_position: glm.vec2
 player_velocity: glm.vec2
 
 init :: proc () {
+    context.logger = log.create_console_logger()
     if sdl.Init(sdl.INIT_EVERYTHING) != 0 {
-        fmt.eprintfln("Error initializing SDL.")
+        log.error("Error initializing SDL.")
         return
     }
 
     display_mode: sdl.DisplayMode
     if sdl.GetCurrentDisplayMode(0, &display_mode) != 0 {
-        fmt.eprintfln("Error getting current display mode.")
+        log.error("Error getting current display mode.")
         return
     }
 
@@ -44,7 +46,7 @@ init :: proc () {
     )
 
     if window == nil {
-        fmt.eprintfln("Error creating SDL window.")
+        log.error("Error creating SDL window.")
         return
     }
 
@@ -55,7 +57,7 @@ init :: proc () {
     )
 
     if renderer == nil {
-        fmt.eprintfln("Error creating SDL renderer.")
+        log.error("Error creating SDL renderer.")
         return
     }
 
@@ -68,9 +70,13 @@ init :: proc () {
         window_width = 800,
         window_height = 600,
     }
+
+    log.debug("Game initialized.")
 }
 
 destroy :: proc () {
+    log.debug("Destroying game.")
+    log.destroy_console_logger(context.logger)
     sdl.DestroyRenderer(game.renderer)
     sdl.DestroyWindow(game.window)
     sdl.Quit()
