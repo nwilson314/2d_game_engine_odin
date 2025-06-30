@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import glm "core:math/linalg/glsl"
 import sdl "vendor:sdl2"
 import img "vendor:sdl2/image"
 
@@ -8,12 +9,18 @@ Game :: struct {
     window: ^sdl.Window,
     renderer: ^sdl.Renderer,
     running: bool,
+    millisecs_previous_frame: u32,
     window_width: i32,
     window_height: i32,
 }
 
+FPS :: 60
+MILLISECS_PER_FRAME :: 1000 / FPS
+
 game: Game
 
+player_position: glm.vec2
+player_velocity: glm.vec2
 
 init :: proc () {
     if sdl.Init(sdl.INIT_EVERYTHING) != 0 {
@@ -70,7 +77,8 @@ destroy :: proc () {
 }
 
 setup :: proc () {
-    
+    player_position = glm.vec2{100, 100}
+    player_velocity = glm.vec2{100, 100}
 }
 
 process_input :: proc () {
@@ -88,7 +96,13 @@ process_input :: proc () {
 }
 
 update :: proc () {
-
+    time_to_wait := MILLISECS_PER_FRAME - (sdl.GetTicks() - game.millisecs_previous_frame)
+    if time_to_wait > 0 && time_to_wait <= MILLISECS_PER_FRAME {
+        sdl.Delay(time_to_wait)
+    }
+    dt := f32(sdl.GetTicks() - game.millisecs_previous_frame) / 1000.0
+    game.millisecs_previous_frame = sdl.GetTicks()
+    player_position += player_velocity * dt
 }
 
 render :: proc () {
@@ -99,7 +113,7 @@ render :: proc () {
     texture := sdl.CreateTextureFromSurface(game.renderer, surface)
     sdl.FreeSurface(surface)
 
-    dest_rect := sdl.Rect{10, 10, 32, 32}
+    dest_rect := sdl.Rect{i32(player_position.x), i32(player_position.y), 32, 32}
     sdl.RenderCopy(game.renderer, texture, nil, &dest_rect)
     sdl.DestroyTexture(texture)
     
