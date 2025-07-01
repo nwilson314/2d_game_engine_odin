@@ -1,10 +1,11 @@
 package main
 
-import "core:fmt"
-import log "core:log"
+import "core:log"
 import glm "core:math/linalg/glsl"
 import sdl "vendor:sdl2"
 import img "vendor:sdl2/image"
+import ecs "ecs"
+
 
 Game :: struct {
     window: ^sdl.Window,
@@ -19,9 +20,6 @@ FPS :: 60
 MILLISECS_PER_FRAME :: 1000 / FPS
 
 game: Game
-
-player_position: glm.vec2
-player_velocity: glm.vec2
 
 init :: proc () {
     context.logger = log.create_console_logger()
@@ -83,8 +81,7 @@ destroy :: proc () {
 }
 
 setup :: proc () {
-    player_position = glm.vec2{100, 100}
-    player_velocity = glm.vec2{100, 100}
+
 }
 
 process_input :: proc () {
@@ -108,20 +105,11 @@ update :: proc () {
     }
     dt := f32(sdl.GetTicks() - game.millisecs_previous_frame) / 1000.0
     game.millisecs_previous_frame = sdl.GetTicks()
-    player_position += player_velocity * dt
 }
 
 render :: proc () {
     sdl.SetRenderDrawColor(game.renderer, 21, 21, 21, 255)
     sdl.RenderClear(game.renderer)
-
-    surface := img.Load("assets/images/tank-tiger-right.png")
-    texture := sdl.CreateTextureFromSurface(game.renderer, surface)
-    sdl.FreeSurface(surface)
-
-    dest_rect := sdl.Rect{i32(player_position.x), i32(player_position.y), 32, 32}
-    sdl.RenderCopy(game.renderer, texture, nil, &dest_rect)
-    sdl.DestroyTexture(texture)
     
     sdl.RenderPresent(game.renderer)
 }
