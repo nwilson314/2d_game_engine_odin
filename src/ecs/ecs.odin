@@ -3,13 +3,15 @@ package ecs
 import "core:log"
 
 
+component_type_map := make(map[typeid]ComponentType)
+
 Entity :: struct {
     id: u64,
 }
 
 ComponentPool :: union {
     ^[dynamic]Transform,
-    ^[dynamic]Velocity,
+    ^[dynamic]RigidBody,
 }
 
 System :: struct {
@@ -34,40 +36,99 @@ Registry :: struct{
     systems: map[typeid]^System,
 }
 
-// world := World {
-//     num_entities = 0,
-//     component_pools = {
-//         new([dynamic]Transform),
-//         new([dynamic]Velocity),
-//     }
-// }
+init_registry :: proc() -> ^Registry {
+    log.debug("Creating registry")
+    registry := new(Registry)
+    registry.num_entities = 0
+    registry.entities_to_add = make(map[u64]Entity)
+    registry.entities_to_remove = make(map[u64]Entity)
+    registry.component_pools = make([]ComponentPool, ComponentType.Count)
+    
+
+    for i in 0 ..< int(ComponentType.Count) {
+        switch ComponentType(i) {
+            case ComponentType.Transform:
+                registry.component_pools[i] = new([dynamic]Transform)
+                component_type_map[typeid_of(Transform)] = ComponentType.Transform
+            case ComponentType.RigidBody:
+                registry.component_pools[i] = new([dynamic]RigidBody)
+                component_type_map[typeid_of(RigidBody)] = ComponentType.RigidBody
+            case ComponentType.Count:
+                break
+        }
+    }
+
+    registry.entity_component_signatures = make([dynamic]bit_set[ComponentType])
+    log.debugf("Entity component signatures: %v", registry.entity_component_signatures)
+    registry.systems = make(map[typeid]^System)
+
+    return registry
+}
+
+destroy_registry :: proc(registry: ^Registry) {
+    log.debug("Destroying registry")
+    free(registry)
+}
 
 ////////////////////////////////
 // Components
 ////////////////////////////////
 
-add_component :: proc(registry: ^Registry, entity: Entity, component_type: ComponentType, component: $T) {
+get_component_type_from_type_id :: proc(type_id: typeid) -> (ComponentType, bool) {
+    if !(type_id in component_type_map) {
+        log.errorf("Component type_id %s not registered to component.", type_id)
+        return ComponentType.Count, false
+    }
+    return component_type_map[type_id], true
+}
+
+add_component :: proc(registry: ^Registry, entity: Entity, component: $T) {
+    component_type, success := get_component_type_from_type_id(typeid_of(T))
+    if !success {
+        // Component Type not registered with component
+        return
+    }
+
     // Get component pool for component type
     component_pool := registry.component_pools[component_type].(^[dynamic]T)
-    if entity.id >= len(component_pool) {
+    if entity.id >= u64(len(component_pool)) {
         resize(component_pool, entity.id + 1)
     }
     component_pool[entity.id] = component
 
     registry.entity_component_signatures[entity.id] |= bit_set[ComponentType]{component_type}
+    log.debugf("Entity component signatures: %v", registry.entity_component_signatures)
 }
 
-remove_component :: proc(registry: ^Registry, entity: Entity, component_type: ComponentType, component: $T) {
+remove_component :: proc(registry: ^Registry, entity: Entity, component: $T) {
+    component_type, success := get_component_type_from_type_id(typeid_of(T))
+    if !success {
+        // Component Type not registered with component
+        return
+    }
+
     component_pool := registry.component_pools[component_type].(^[dynamic]T)
-    component_pool[entity.id] = nil
+    component_pool[entity.id] = {}
     registry.entity_component_signatures[entity.id] &= ~bit_set[ComponentType]{component_type}
 }
 
-has_component :: proc(registry: ^Registry, entity: Entity, component_type: ComponentType) -> bool {
-    return registry.entity_component_signatures[entity.id] & bit_set[ComponentType]{component_type} != bit_set[ComponentType]{component_type}
+has_component :: proc(registry: ^Registry, entity: Entity, component: $T) -> bool {
+    component_type, success := get_component_type_from_type_id(typeid_of(T))
+    if !success {
+        // Component Type not registered with component
+        return false
+    }
+    ent_sig := registry.entity_component_signatures[entity.id]
+    return ent_sig & bit_set[ComponentType]{component_type} == bit_set[ComponentType]{component_type}
 }
 
-get_component :: proc(registry: ^Registry, entity: Entity, component_type: ComponentType, component: $T) -> T {
+get_component :: proc(registry: ^Registry, entity: Entity, component: $T) -> T {
+    component_type, success := get_component_type_from_type_id(typeid_of(T))
+    if !success {
+        // Component Type not registered with component
+        return nil
+    }
+    
     component_pool := registry.component_pools[component_type].(^[dynamic]T)
     return component_pool[entity.id]
 }
@@ -122,14 +183,14 @@ remove_entity_from_system :: proc(system: ^System, entity: Entity) {
 ////////////////////////////////
 
 create_entity :: proc(registry: ^Registry) -> Entity {
-    ent_id := registry.num_entities + 1
+    ent_id := registry.num_entities
     registry.num_entities += 1
     append(&registry.entity_component_signatures, bit_set[ComponentType]{})
     entity := Entity{id = ent_id}
 
     registry.entities_to_add[ent_id] = entity
 
-    log.debug("Created entity with id: %", ent_id)
+    log.debugf("Created entity with id: %d", ent_id)
     return entity
 }
 
@@ -140,7 +201,8 @@ remove_entity :: proc(registry: ^Registry, entity: Entity) {
 
 update_registry :: proc(registry: ^Registry) {
     for ent_id in registry.entities_to_add {
-        log.debug("Adding entity with id: %", ent_id)
+        add_entity_to_systems(registry, registry.entities_to_add[ent_id])
+        delete_key(&registry.entities_to_add, ent_id)
     }
 }
 

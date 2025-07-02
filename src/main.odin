@@ -1,5 +1,6 @@
 package main
 
+
 import "core:log"
 import glm "core:math/linalg/glsl"
 import sdl "vendor:sdl2"
@@ -14,6 +15,7 @@ Game :: struct {
     millisecs_previous_frame: u32,
     window_width: i32,
     window_height: i32,
+    registry: ^ecs.Registry,
 }
 
 FPS :: 60
@@ -22,7 +24,6 @@ MILLISECS_PER_FRAME :: 1000 / FPS
 game: Game
 
 init :: proc () {
-    context.logger = log.create_console_logger()
     if sdl.Init(sdl.INIT_EVERYTHING) != 0 {
         log.error("Error initializing SDL.")
         return
@@ -61,12 +62,15 @@ init :: proc () {
 
     sdl.SetWindowFullscreen(window, sdl.WINDOW_FULLSCREEN_DESKTOP)
 
+    game_registry := ecs.init_registry()
     game = Game{
         window = window,
         renderer = renderer,
         running = true,
+        millisecs_previous_frame = 0,
         window_width = 800,
         window_height = 600,
+        registry = game_registry,
     }
 
     log.debug("Game initialized.")
@@ -74,14 +78,36 @@ init :: proc () {
 
 destroy :: proc () {
     log.debug("Destroying game.")
-    log.destroy_console_logger(context.logger)
+    ecs.destroy_registry(game.registry)
     sdl.DestroyRenderer(game.renderer)
     sdl.DestroyWindow(game.window)
     sdl.Quit()
+    free_all()
+    log.debug("Game destroyed.")
 }
 
 setup :: proc () {
+    log.debug("Setting up game.")
+    tank := ecs.create_entity(game.registry)
+    truck := ecs.create_entity(game.registry)
 
+    ecs.add_component(game.registry, tank, ecs.Transform{
+        position = glm.vec2{0.0, 0.0},
+        rotation = 0.0,
+        scale = glm.vec2{1.0, 1.0},
+    })
+    ecs.add_component(game.registry, tank, ecs.RigidBody{
+        velocity = glm.vec2{0.0, 0.0},
+    })
+    ecs.add_component(game.registry, truck, ecs.Transform{
+        position = glm.vec2{0.0, 0.0},
+        rotation = 0.0,
+        scale = glm.vec2{1.0, 1.0},
+    })
+    ecs.add_component(game.registry, truck, ecs.RigidBody{
+        velocity = glm.vec2{0.0, 0.0},
+    })
+    log.debug("Finished setting up game.")
 }
 
 process_input :: proc () {
@@ -115,6 +141,9 @@ render :: proc () {
 }
 
 main :: proc () {
+    context.logger = log.create_console_logger()
+    defer log.destroy_console_logger(context.logger)
+
     init()
     setup()
     for game.running {
