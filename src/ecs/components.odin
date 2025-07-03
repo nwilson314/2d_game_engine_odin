@@ -1,7 +1,7 @@
 package ecs
 
 import glm "core:math/linalg/glsl"
-
+import sdl "vendor:sdl2"
 
 ////////////////////////////////
 // Components
@@ -23,7 +23,7 @@ ComponentType :: enum {
 
 Transform :: struct {
     position: glm.vec2,
-    rotation: f32,
+    rotation: f64,
     scale: glm.vec2,
 }
 
@@ -34,4 +34,6 @@ RigidBody :: struct {
 Sprite :: struct {
     w: u32,
     h: u32,
+    name: string,
+    src_rect: sdl.Rect,
 }

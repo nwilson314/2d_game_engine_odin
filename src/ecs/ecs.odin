@@ -1,9 +1,8 @@
 package ecs
 
 import "core:log"
-import "core:fmt"
 import sdl "vendor:sdl2"
-
+import asset_store "../asset_store"
 
 component_type_map := make(map[typeid]ComponentType)
 system_type_map := make(map[u64]SystemType)
@@ -23,7 +22,7 @@ System :: struct {
     id: u64,
     component_signature: bit_set[ComponentType],
     entities: [dynamic]Entity,
-    update: proc(registry: ^Registry, system: ^System, dt: f32),
+    update: proc(registry: ^Registry, asset_store: ^asset_store.AssetStore, system: ^System, dt: f32),
 }
 
 Registry :: struct{
@@ -103,8 +102,6 @@ init_registry :: proc(renderer: ^sdl.Renderer) -> ^Registry {
         }
     }
 
-    fmt.printf("System type map: %v\n", system_type_map)
-
     return registry
 }
 
@@ -121,12 +118,12 @@ update_registry :: proc(registry: ^Registry) {
 }
 
 
-run_systems :: proc(registry: ^Registry, dt: f32) {
-    registry.systems[SystemType.Movement].update(registry, registry.systems[SystemType.Movement], dt)
+run_systems :: proc(registry: ^Registry, asset_store: ^asset_store.AssetStore, dt: f32) {
+    registry.systems[SystemType.Movement].update(registry, asset_store, registry.systems[SystemType.Movement], dt)
 }
 
-run_render_systems :: proc(registry: ^Registry) {
-    registry.systems[SystemType.Render].update(registry, registry.systems[SystemType.Render], 0.0)
+run_render_systems :: proc(registry: ^Registry, asset_store: ^asset_store.AssetStore) {
+    registry.systems[SystemType.Render].update(registry, asset_store, registry.systems[SystemType.Render], 0.0)
 }
 
 ////////////////////////////////
