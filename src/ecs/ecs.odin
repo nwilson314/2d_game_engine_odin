@@ -1,9 +1,13 @@
 package ecs
 
 import "core:log"
+import "core:fmt"
+import sdl "vendor:sdl2"
 
 
 component_type_map := make(map[typeid]ComponentType)
+system_type_map := make(map[u64]SystemType)
+system_id_counter: u64 = 0
 
 Entity :: struct {
     id: u64,
@@ -12,15 +16,18 @@ Entity :: struct {
 ComponentPool :: union {
     ^[dynamic]Transform,
     ^[dynamic]RigidBody,
+    ^[dynamic]Sprite,
 }
 
 System :: struct {
+    id: u64,
     component_signature: bit_set[ComponentType],
     entities: [dynamic]Entity,
-    update: proc(registry: ^Registry, system: ^System),
+    update: proc(registry: ^Registry, system: ^System, dt: f32),
 }
 
 Registry :: struct{
+    renderer: ^sdl.Renderer,
     num_entities: u64,
     entities_to_add: map[u64]Entity,
     entities_to_remove: map[u64]Entity,
@@ -33,18 +40,21 @@ Registry :: struct{
     // Array of bit sets, each bit set contains the component types for an entity.
     // The index of the bit set in the array is the entity id.
     entity_component_signatures: [dynamic]bit_set[ComponentType],
-    systems: map[typeid]^System,
+    systems: map[SystemType]^System,
 }
 
-init_registry :: proc() -> ^Registry {
+init_registry :: proc(renderer: ^sdl.Renderer) -> ^Registry {
     log.debug("Creating registry")
+
+    // Initialize registry
     registry := new(Registry)
+    registry.renderer = renderer
     registry.num_entities = 0
     registry.entities_to_add = make(map[u64]Entity)
     registry.entities_to_remove = make(map[u64]Entity)
     registry.component_pools = make([]ComponentPool, ComponentType.Count)
     
-
+    // Initialize component pools
     for i in 0 ..< int(ComponentType.Count) {
         switch ComponentType(i) {
             case ComponentType.Transform:
@@ -53,14 +63,47 @@ init_registry :: proc() -> ^Registry {
             case ComponentType.RigidBody:
                 registry.component_pools[i] = new([dynamic]RigidBody)
                 component_type_map[typeid_of(RigidBody)] = ComponentType.RigidBody
+            case ComponentType.Sprite:
+                registry.component_pools[i] = new([dynamic]Sprite)
+                component_type_map[typeid_of(Sprite)] = ComponentType.Sprite
             case ComponentType.Count:
                 break
         }
     }
 
     registry.entity_component_signatures = make([dynamic]bit_set[ComponentType])
-    log.debugf("Entity component signatures: %v", registry.entity_component_signatures)
-    registry.systems = make(map[typeid]^System)
+    
+    // Initialize systems
+    registry.systems = make(map[SystemType]^System)
+
+    for i in 0 ..< int(SystemType.Count) {
+        switch SystemType(i) {
+            case SystemType.Movement:
+                movement_system := new(System)
+                movement_system.id = system_id_counter
+                system_id_counter += 1
+                movement_system.component_signature = bit_set[ComponentType]{ComponentType.Transform, ComponentType.RigidBody}
+                movement_system.entities = make([dynamic]Entity)
+                movement_system.update = MovementSystem
+                registry.systems[SystemType.Movement] = movement_system
+
+                system_type_map[movement_system.id] = SystemType.Movement
+            case SystemType.Render:
+                render_system := new(System)
+                render_system.id = system_id_counter
+                system_id_counter += 1
+                render_system.component_signature = bit_set[ComponentType]{ComponentType.Transform, ComponentType.Sprite}
+                render_system.entities = make([dynamic]Entity)
+                render_system.update = RenderSystem
+                registry.systems[SystemType.Render] = render_system
+
+                system_type_map[render_system.id] = SystemType.Render
+            case SystemType.Count:
+                break
+        }
+    }
+
+    fmt.printf("System type map: %v\n", system_type_map)
 
     return registry
 }
@@ -68,6 +111,22 @@ init_registry :: proc() -> ^Registry {
 destroy_registry :: proc(registry: ^Registry) {
     log.debug("Destroying registry")
     free(registry)
+}
+
+update_registry :: proc(registry: ^Registry) {
+    for ent_id in registry.entities_to_add {
+        add_entity_to_systems(registry, registry.entities_to_add[ent_id])
+        delete_key(&registry.entities_to_add, ent_id)
+    }
+}
+
+
+run_systems :: proc(registry: ^Registry, dt: f32) {
+    registry.systems[SystemType.Movement].update(registry, registry.systems[SystemType.Movement], dt)
+}
+
+run_render_systems :: proc(registry: ^Registry) {
+    registry.systems[SystemType.Render].update(registry, registry.systems[SystemType.Render], 0.0)
 }
 
 ////////////////////////////////
@@ -97,7 +156,6 @@ add_component :: proc(registry: ^Registry, entity: Entity, component: $T) {
     component_pool[entity.id] = component
 
     registry.entity_component_signatures[entity.id] |= bit_set[ComponentType]{component_type}
-    log.debugf("Entity component signatures: %v", registry.entity_component_signatures)
 }
 
 remove_component :: proc(registry: ^Registry, entity: Entity, component: $T) {
@@ -122,7 +180,7 @@ has_component :: proc(registry: ^Registry, entity: Entity, component: $T) -> boo
     return ent_sig & bit_set[ComponentType]{component_type} == bit_set[ComponentType]{component_type}
 }
 
-get_component :: proc(registry: ^Registry, entity: Entity, component: $T) -> T {
+get_component :: proc(registry: ^Registry, entity: Entity, component: $T) -> ^T {
     component_type, success := get_component_type_from_type_id(typeid_of(T))
     if !success {
         // Component Type not registered with component
@@ -130,7 +188,7 @@ get_component :: proc(registry: ^Registry, entity: Entity, component: $T) -> T {
     }
     
     component_pool := registry.component_pools[component_type].(^[dynamic]T)
-    return component_pool[entity.id]
+    return &component_pool[entity.id]
 }
 
 ////////////////////////////////
@@ -138,24 +196,24 @@ get_component :: proc(registry: ^Registry, entity: Entity, component: $T) -> T {
 ////////////////////////////////
 
 add_system :: proc(registry: ^Registry, system: ^System) {
-    id := typeid_of(type_of(system))
-    registry.systems[id] = system
+    system_type := system_type_map[system.id]
+    registry.systems[system_type] = system
 }
 
 remove_system :: proc(registry: ^Registry, system: ^System) {
-    id := typeid_of(type_of(system))
-    delete_key(&registry.systems, id)
+    system_type := system_type_map[system.id]
+    delete_key(&registry.systems, system_type)
 }
 
 has_system :: proc(registry: ^Registry, system: ^System) -> bool {
-    id := typeid_of(type_of(system))
-    return id in registry.systems
+    system_type := system_type_map[system.id]
+    return system_type in registry.systems
 }
 
 add_entity_to_systems :: proc(registry: ^Registry, entity: Entity) {
     entity_component_signature := registry.entity_component_signatures[entity.id]
 
-    for type_id, system in registry.systems {
+    for system_type, system in registry.systems {
         system_signature := system.component_signature
         
         is_interested := entity_component_signature & system_signature == system_signature
@@ -197,13 +255,3 @@ create_entity :: proc(registry: ^Registry) -> Entity {
 remove_entity :: proc(registry: ^Registry, entity: Entity) {
     
 }
-
-
-update_registry :: proc(registry: ^Registry) {
-    for ent_id in registry.entities_to_add {
-        add_entity_to_systems(registry, registry.entities_to_add[ent_id])
-        delete_key(&registry.entities_to_add, ent_id)
-    }
-}
-
-

@@ -62,7 +62,7 @@ init :: proc () {
 
     sdl.SetWindowFullscreen(window, sdl.WINDOW_FULLSCREEN_DESKTOP)
 
-    game_registry := ecs.init_registry()
+    game_registry := ecs.init_registry(renderer)
     game = Game{
         window = window,
         renderer = renderer,
@@ -86,30 +86,6 @@ destroy :: proc () {
     log.debug("Game destroyed.")
 }
 
-setup :: proc () {
-    log.debug("Setting up game.")
-    tank := ecs.create_entity(game.registry)
-    truck := ecs.create_entity(game.registry)
-
-    ecs.add_component(game.registry, tank, ecs.Transform{
-        position = glm.vec2{0.0, 0.0},
-        rotation = 0.0,
-        scale = glm.vec2{1.0, 1.0},
-    })
-    ecs.add_component(game.registry, tank, ecs.RigidBody{
-        velocity = glm.vec2{0.0, 0.0},
-    })
-    ecs.add_component(game.registry, truck, ecs.Transform{
-        position = glm.vec2{0.0, 0.0},
-        rotation = 0.0,
-        scale = glm.vec2{1.0, 1.0},
-    })
-    ecs.add_component(game.registry, truck, ecs.RigidBody{
-        velocity = glm.vec2{0.0, 0.0},
-    })
-    log.debug("Finished setting up game.")
-}
-
 process_input :: proc () {
     event: sdl.Event
     for sdl.PollEvent(&event) {
@@ -131,11 +107,16 @@ update :: proc () {
     }
     dt := f32(sdl.GetTicks() - game.millisecs_previous_frame) / 1000.0
     game.millisecs_previous_frame = sdl.GetTicks()
+
+    ecs.run_systems(game.registry, dt)
+    ecs.update_registry(game.registry)
 }
 
 render :: proc () {
     sdl.SetRenderDrawColor(game.renderer, 21, 21, 21, 255)
     sdl.RenderClear(game.renderer)
+
+    ecs.run_render_systems(game.registry)
     
     sdl.RenderPresent(game.renderer)
 }

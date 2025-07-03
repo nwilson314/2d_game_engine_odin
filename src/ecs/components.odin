@@ -17,6 +17,7 @@ import glm "core:math/linalg/glsl"
 ComponentType :: enum {
     Transform,
     RigidBody,
+    Sprite,
     Count,
 }
 
@@ -28,4 +29,9 @@ Transform :: struct {
 
 RigidBody :: struct {
     velocity: glm.vec2,
+}
+
+Sprite :: struct {
+    w: u32,
+    h: u32,
 }
