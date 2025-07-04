@@ -113,6 +113,7 @@ update :: proc () {
     if time_to_wait > 0 && time_to_wait <= MILLISECS_PER_FRAME {
         sdl.Delay(time_to_wait)
     }
+    log.debugf("FPS: %f", 1.0 / (f32(sdl.GetTicks() - game.millisecs_previous_frame) / 1000.0))
     dt := f32(sdl.GetTicks() - game.millisecs_previous_frame) / 1000.0
     game.millisecs_previous_frame = sdl.GetTicks()
 

@@ -34,6 +34,7 @@ RigidBody :: struct {
 Sprite :: struct {
     w: u32,
     h: u32,
+    z_index: u32,
     name: string,
     src_rect: sdl.Rect,
 }
