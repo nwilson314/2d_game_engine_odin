@@ -12,10 +12,13 @@ Entity :: struct {
     id: u64,
 }
 
+  // ComponentPool is a union of all the component types. It is used to create arrays of components,
+  // where the index of the component in the array is the entity id.
 ComponentPool :: union {
     ^[dynamic]Transform,
     ^[dynamic]RigidBody,
     ^[dynamic]Sprite,
+    ^[dynamic]Animation,
 }
 
 System :: struct {
@@ -65,6 +68,9 @@ init_registry :: proc(renderer: ^sdl.Renderer) -> ^Registry {
             case ComponentType.Sprite:
                 registry.component_pools[i] = new([dynamic]Sprite)
                 component_type_map[typeid_of(Sprite)] = ComponentType.Sprite
+            case ComponentType.Animation:
+                registry.component_pools[i] = new([dynamic]Animation)
+                component_type_map[typeid_of(Animation)] = ComponentType.Animation
             case ComponentType.Count:
                 break
         }
@@ -87,6 +93,16 @@ init_registry :: proc(renderer: ^sdl.Renderer) -> ^Registry {
                 registry.systems[SystemType.Movement] = movement_system
 
                 system_type_map[movement_system.id] = SystemType.Movement
+            case SystemType.Animation:
+                animation_system := new(System)
+                animation_system.id = system_id_counter
+                system_id_counter += 1
+                animation_system.component_signature = bit_set[ComponentType]{ComponentType.Sprite, ComponentType.Animation}
+                animation_system.entities = make([dynamic]Entity)
+                animation_system.update = AnimationSystem
+                registry.systems[SystemType.Animation] = animation_system
+
+                system_type_map[animation_system.id] = SystemType.Animation
             case SystemType.Render:
                 render_system := new(System)
                 render_system.id = system_id_counter
@@ -123,6 +139,7 @@ run_systems :: proc(registry: ^Registry, asset_store: ^asset_store.AssetStore, d
 }
 
 run_render_systems :: proc(registry: ^Registry, asset_store: ^asset_store.AssetStore) {
+    registry.systems[SystemType.Animation].update(registry, asset_store, registry.systems[SystemType.Animation], 0.0)
     registry.systems[SystemType.Render].update(registry, asset_store, registry.systems[SystemType.Render], 0.0)
 }
 

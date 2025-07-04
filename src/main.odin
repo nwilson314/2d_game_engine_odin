@@ -78,52 +78,64 @@ setup :: proc (game: ^engine.Game) {
 
     asset_store.add_texture_to_store(game.asset_store, game.renderer, "tank", "assets/images/tank-panther-right.png")
     asset_store.add_texture_to_store(game.asset_store, game.renderer, "truck", "assets/images/truck-ford-right.png")
+    asset_store.add_texture_to_store(game.asset_store, game.renderer, "chopper", "assets/images/chopper.png")
+    asset_store.add_texture_to_store(game.asset_store, game.renderer, "radar", "assets/images/radar.png")
     asset_store.add_texture_to_store(game.asset_store, game.renderer, "jungle", "assets/tilemaps/jungle.png")
 
     load_tilemap(game, "jungle", "assets/tilemaps/jungle.map")
-    tank := ecs.create_entity(game.registry)
-    truck := ecs.create_entity(game.registry)
-
-    ecs.add_component(game.registry, tank, ecs.Transform{
+    chopper := ecs.create_entity(game.registry)
+    ecs.add_component(game.registry, chopper, ecs.Transform{
         position = glm.vec2{0.0, 0.0},
         rotation = 0.0,
         scale = glm.vec2{1.0, 1.0},
     })
-    ecs.add_component(game.registry, tank, ecs.RigidBody{
-        velocity = glm.vec2{40.0, 0.0},
+    ecs.add_component(game.registry, chopper, ecs.RigidBody{
+        velocity = glm.vec2{0.0, 0.0},
     })
-    ecs.add_component(game.registry, tank, ecs.Sprite{
+    ecs.add_component(game.registry, chopper, ecs.Sprite{
         w = 32,
         h = 32,
         z_index = 1,
-        name = "tank",
+        name = "chopper",
         src_rect = sdl.Rect{
             x = 0,
             y = 0,
             w = 32,
             h = 32,
         },
+    })
+    ecs.add_component(game.registry, chopper, ecs.Animation{
+        num_frames = 2,
+        current_frame = 0,
+        frame_speed_rate = 10,
+        start_time = sdl.GetTicks(),
+        is_loop = true,
     })
 
-    ecs.add_component(game.registry, truck, ecs.Transform{
-        position = glm.vec2{0.0, 0.0},
+    radar := ecs.create_entity(game.registry)
+    ecs.add_component(game.registry, radar, ecs.Transform{
+        position = glm.vec2{f32(game.window_width - 74), 10},
         rotation = 0.0,
-        scale = glm.vec2{2.0, 2.0},
+        scale = glm.vec2{1.0, 1.0},
     })
-    ecs.add_component(game.registry, truck, ecs.RigidBody{
-        velocity = glm.vec2{5.0, 5.0},
-    })
-    ecs.add_component(game.registry, truck, ecs.Sprite{
-        w = 32,
-        h = 32,
+    ecs.add_component(game.registry, radar, ecs.Sprite{
+        w = 64,
+        h = 64,
         z_index = 1,
-        name = "truck",
+        name = "radar",
         src_rect = sdl.Rect{
             x = 0,
             y = 0,
-            w = 32,
-            h = 32,
+            w = 64,
+            h = 64,
         },
+    })
+    ecs.add_component(game.registry, radar, ecs.Animation{
+        num_frames = 8,
+        current_frame = 0,
+        frame_speed_rate = 8,
+        start_time = sdl.GetTicks(),
+        is_loop = true,
     })
     log.debug("Finished setting up game.")
 }

@@ -16,6 +16,7 @@ import asset_store "../asset_store"
 
 SystemType :: enum {
     Movement,
+    Animation,
     Render,
     Count,
 }
@@ -75,4 +76,20 @@ RenderSystem :: proc(registry: ^Registry, ast_store: ^asset_store.AssetStore, sy
             sdl.RendererFlip.NONE,
         )
     }
+}
+
+AnimationSystem :: proc(registry: ^Registry, ast_store: ^asset_store.AssetStore, system: ^System, dt: f32) {
+    for entity in system.entities {
+        animation := get_component(registry, entity, Animation{})
+        sprite := get_component(registry, entity, Sprite{})
+
+        animation.current_frame = 
+        (i32(sdl.GetTicks() - animation.start_time) * 
+            (animation.frame_speed_rate) / 1000) % animation.num_frames
+        log.debugf("Animation current frame for entity %d: %d", entity.id, animation.current_frame)
+
+        sprite.src_rect.x = animation.current_frame * i32(sprite.w)
+
+    }
+
 }

@@ -18,6 +18,7 @@ ComponentType :: enum {
     Transform,
     RigidBody,
     Sprite,
+    Animation,
     Count,
 }
 
@@ -37,4 +38,12 @@ Sprite :: struct {
     z_index: u32,
     name: string,
     src_rect: sdl.Rect,
+}
+
+Animation :: struct {
+    num_frames: i32,
+    current_frame: i32,
+    frame_speed_rate: i32,
+    start_time: u32,
+    is_loop: bool
 }

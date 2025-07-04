@@ -23,6 +23,8 @@ Game :: struct {
 
 FPS :: 60
 MILLISECS_PER_FRAME :: 1000 / FPS
+WINDOW_WIDTH :: 800
+WINDOW_HEIGHT :: 600
 
 
 
@@ -42,8 +44,8 @@ init_engine :: proc () -> (^Game, bool) {
         nil, 
         sdl.WINDOWPOS_CENTERED, 
         sdl.WINDOWPOS_CENTERED, 
-        800, 
-        600,
+        display_mode.w, 
+        display_mode.h,
         sdl.WINDOW_BORDERLESS
     )
 
@@ -72,8 +74,8 @@ init_engine :: proc () -> (^Game, bool) {
         renderer = renderer,
         running = true,
         millisecs_previous_frame = 0,
-        window_width = 800,
-        window_height = 600,
+        window_width = display_mode.w,
+        window_height = display_mode.h,
         registry = game_registry,
         asset_store = asset_store,
     }
@@ -113,7 +115,7 @@ update :: proc () {
     if time_to_wait > 0 && time_to_wait <= MILLISECS_PER_FRAME {
         sdl.Delay(time_to_wait)
     }
-    log.debugf("FPS: %f", 1.0 / (f32(sdl.GetTicks() - game.millisecs_previous_frame) / 1000.0))
+    // log.debugf("FPS: %f", 1.0 / (f32(sdl.GetTicks() - game.millisecs_previous_frame) / 1000.0))
     dt := f32(sdl.GetTicks() - game.millisecs_previous_frame) / 1000.0
     game.millisecs_previous_frame = sdl.GetTicks()
 
